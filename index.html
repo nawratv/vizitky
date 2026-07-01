@@ -56,20 +56,26 @@
   .crop.show{display:block}
   .stage{position:relative;width:100%;background:#0c1322;border-radius:var(--radius);
     overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
-  .stage img{display:block;width:100%;pointer-events:none}
+  .stage img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
   .cbox{position:absolute;border:2px solid var(--mark);box-sizing:border-box;cursor:move;
     box-shadow:0 0 0 9999px rgba(8,12,22,.5)}
   .handle{position:absolute;width:28px;height:28px;background:var(--mark);border:3px solid #fff;
     border-radius:50%;box-sizing:border-box;touch-action:none}
   .handle.tl{left:-14px;top:-14px} .handle.tr{right:-14px;top:-14px}
   .handle.bl{left:-14px;bottom:-14px} .handle.br{right:-14px;bottom:-14px}
+  .crop{padding-bottom:150px}
   .crop-hint{text-align:center;color:var(--muted);font-size:12px;margin-top:8px}
-  .crop-actions{display:flex;gap:10px;margin-top:10px}
+  .crop-bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--paper);
+    border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(19,32,58,.10);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  .crop-bar-inner{max-width:560px;margin:0 auto}
+  .crop-actions{display:flex;gap:10px}
   .crop-actions button{flex:1;border:none;cursor:pointer;font-weight:700;padding:14px;border-radius:11px;font-size:15px}
   .cbtn-go{background:var(--mark);color:var(--ink)}
   .cbtn-alt{background:var(--card);border:1px solid var(--line)!important;color:var(--ink)}
   .retake{display:block;width:100%;text-align:center;background:none;border:none;color:var(--mark);
-    font-size:13px;font-weight:600;margin-top:10px;cursor:pointer}
+    font-size:13px;font-weight:600;margin-top:8px;cursor:pointer}
+  body.cropping #tray{display:none}
 
   .work{display:none;margin-top:18px;background:var(--card);border:1px solid var(--line);
     border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
@@ -174,11 +180,13 @@
         </div>
       </div>
       <p class="crop-hint">Posuň a roztáhni rámeček přesně na vizitku.</p>
-      <div class="crop-actions">
-        <button class="cbtn-alt" id="wholeBtn">Celá fotka</button>
-        <button class="cbtn-go" id="cropBtn">Rozpoznat výřez</button>
-      </div>
-      <button class="retake" id="retakeBtn">Vyfotit znovu</button>
+      <div class="crop-bar"><div class="crop-bar-inner">
+        <div class="crop-actions">
+          <button class="cbtn-alt" id="wholeBtn">Celá fotka</button>
+          <button class="cbtn-go" id="cropBtn">Rozpoznat výřez</button>
+        </div>
+        <button class="retake" id="retakeBtn">Vyfotit znovu</button>
+      </div></div>
     </div>
 
     <div class="work" id="work">
@@ -248,22 +256,30 @@
 
   /* ---------- OŘEZ ---------- */
   var stage=$("stage"),cImg=$("cropImg"),cbox=$("cbox");
-  var natW=0,natH=0,dispW=0,dispH=0,box={x:0,y:0,w:0,h:0},drag=null;
+  var natW=0,natH=0,rect={x:0,y:0,w:0,h:0},scale=1,box={x:0,y:0,w:0,h:0},drag=null;
   var CARD=1.586;
 
+  function layoutStage(){
+    var sW=stage.clientWidth;
+    var maxH=Math.max(220, window.innerHeight-260);   /* nech místo na hlavičku + spodní lištu */
+    var sH=Math.min(sW*natH/natW, maxH);
+    stage.style.height=sH+"px";
+    scale=Math.min(sW/natW, sH/natH);
+    var rW=natW*scale, rH=natH*scale;
+    rect={x:(sW-rW)/2, y:(sH-rH)/2, w:rW, h:rH};
+  }
   function showCrop(file){
     var img=new Image();
     img.onload=function(){
-      natW=img.naturalWidth; natH=img.naturalHeight;
-      cImg.src=img.src;
+      natW=img.naturalWidth; natH=img.naturalHeight; cImg.src=img.src;
       $("form").classList.remove("show"); $("work").classList.remove("show");
+      document.body.classList.add("cropping");
       $("crop").classList.add("show");
       requestAnimationFrame(function(){
-        dispW=stage.clientWidth||340; dispH=dispW*natH/natW;
-        stage.style.height=dispH+"px";
-        var w=dispW*0.88, h=w/CARD;
-        if(h>dispH*0.92){ h=dispH*0.92; w=h*CARD; if(w>dispW*0.96) w=dispW*0.96; }
-        box={x:(dispW-w)/2,y:(dispH-h)/2,w:w,h:h}; drawBox();
+        layoutStage();
+        var w=rect.w*0.9, h=w/CARD;
+        if(h>rect.h*0.9){ h=rect.h*0.9; w=h*CARD; if(w>rect.w*0.95) w=rect.w*0.95; }
+        box={x:rect.x+(rect.w-w)/2, y:rect.y+(rect.h-h)/2, w:w, h:h}; drawBox();
       });
       window.scrollTo({top:0,behavior:"smooth"});
     };
@@ -271,8 +287,9 @@
   }
   function drawBox(){ cbox.style.left=box.x+"px";cbox.style.top=box.y+"px";cbox.style.width=box.w+"px";cbox.style.height=box.h+"px"; }
   function clampBox(){
-    box.w=Math.max(50,Math.min(box.w,dispW)); box.h=Math.max(50,Math.min(box.h,dispH));
-    box.x=Math.max(0,Math.min(box.x,dispW-box.w)); box.y=Math.max(0,Math.min(box.y,dispH-box.h));
+    box.w=Math.max(50,Math.min(box.w,rect.w)); box.h=Math.max(50,Math.min(box.h,rect.h));
+    box.x=Math.max(rect.x,Math.min(box.x,rect.x+rect.w-box.w));
+    box.y=Math.max(rect.y,Math.min(box.y,rect.y+rect.h-box.h));
   }
   cbox.addEventListener("pointerdown",function(e){
     if(e.target.classList.contains("handle")) return;
@@ -301,13 +318,12 @@
     });
     h.addEventListener("pointerup",function(){ drag=null; });
   });
-
   $("cropBtn").addEventListener("click",function(){ doCrop(false); });
   $("wholeBtn").addEventListener("click",function(){ doCrop(true); });
   function doCrop(whole){
-    var k=natW/dispW, sx,sy,sw,sh;
+    var sx,sy,sw,sh;
     if(whole){ sx=0;sy=0;sw=natW;sh=natH; }
-    else{ sx=box.x*k; sy=box.y*k; sw=box.w*k; sh=box.h*k; }
+    else{ sx=(box.x-rect.x)/scale; sy=(box.y-rect.y)/scale; sw=box.w/scale; sh=box.h/scale; }
     var c=document.createElement("canvas");
     c.width=Math.max(1,Math.round(sw)); c.height=Math.max(1,Math.round(sh));
     var ctx=c.getContext("2d");
@@ -335,6 +351,7 @@
     return {url:url,canvas:c};
   }
   function runOcr(srcCanvas){
+    document.body.classList.remove("cropping");
     $("crop").classList.remove("show");
     $("work").classList.add("show");
     $("progressTxt").textContent="Rozpoznávám text…";
@@ -574,35 +591,42 @@
     return (base.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9]+/g,"-")
       .replace(/^-+|-+$/g,"").toLowerCase().slice(0,40))||"kontakt";
   }
+  /* Web Share má povolené jen některé typy; zkusíme je popořadě a necháme příponu .vcf */
+  var SHARE_MIMES=["text/vcard","text/x-vcard","text/plain"];
+  function makeShareFiles(items){
+    for(var i=0;i<SHARE_MIMES.length;i++){
+      var files=items.map(function(it){ return new File([it.text], it.name, {type:SHARE_MIMES[i]}); });
+      try{ if(navigator.canShare && navigator.canShare({files:files})) return files; }catch(e){}
+    }
+    return null;
+  }
   $("sendBtn").addEventListener("click",function(){
     if(!batch.length)return;
     var to=$("mailto").value.trim();
     var subj=batch.length+" kontaktů z vizitek ("+new Date().toLocaleDateString("cs-CZ")+")";
-    /* jeden .vcf na kontakt = spolehlivý import i v telefonu */
-    var seen={}, files=batch.map(function(c){
-      var name=slug(c); if(seen[name]) name+="-"+(++seen[name]); else seen[name]=1;
-      return new File([toVCard(c)+"\r\n"], name+".vcf", {type:"text/vcard"});
-    });
-    if(navigator.share&&navigator.canShare&&navigator.canShare({files:files})){
+    var perContact=[],seen={};
+    batch.forEach(function(c){ var n=slug(c); if(seen[n]) n+="-"+(++seen[n]); else seen[n]=1;
+      perContact.push({name:n+".vcf", text:toVCard(c)+"\r\n"}); });
+    var combined=[{name:vcfName(), text:buildVcf()}];
+    /* 1) víc samostatných souborů; když to prohlížeč nevezme, 2) jeden společný */
+    var files = makeShareFiles(perContact) || makeShareFiles(combined);
+    if(files && navigator.share){
       navigator.share({files:files,title:subj,text:(to?("Příjemce: "+to):subj)})
-        .then(function(){ toast(to?("Přiloženo "+files.length+" kontaktů. Příjemce: "+to):("Přiloženo "+files.length+" kontaktů ✓")); })
-        .catch(function(err){ if(err&&err.name==="AbortError")return; shareCombined(to,subj); });
-    } else { shareCombined(to,subj); }
-  });
-  function shareCombined(to,subj){
-    var combined=new File([buildVcf()],vcfName(),{type:"text/vcard"});
-    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[combined]})){
-      navigator.share({files:[combined],title:subj,text:(to?("Příjemce: "+to):subj)})
-        .then(function(){ toast(to?("Soubor přiložen. Příjemce: "+to):"Soubor přiložen ✓"); })
+        .then(function(){
+          var msg = files.length>1 ? ("Přiloženo "+files.length+" souborů") : "Přiložen soubor se všemi kontakty";
+          toast(to?(msg+". Příjemce: "+to):(msg+" ✓"));
+        })
         .catch(function(err){ if(err&&err.name==="AbortError")return; mailFallback(to,subj); });
-    } else { mailFallback(to,subj); }
-  }
+    } else {
+      mailFallback(to,subj);
+    }
+  });
   function mailFallback(to,subj){
     var fname=vcfName(); downloadVcf(buildVcf(),fname);
     var body="Přikládám "+batch.length+" kontaktů v jednom souboru "+fname+" (právě stažený do telefonu) – prosím přilož ho k tomuto e-mailu. Telefon přílohu nevloží automaticky.";
     var a=document.createElement("a");a.href="mailto:"+to+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
     document.body.appendChild(a);setTimeout(function(){a.click();a.remove();},350);
-    toast("Stažen 1 soubor s "+batch.length+" kontakty – přilož ho do e-mailu.");
+    toast("Sdílení nedostupné – stažen soubor se "+batch.length+" kontakty, přilož ho ručně.");
   }
 
   var toastT;
