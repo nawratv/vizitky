@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#13203A">
+<title>Vizitky → kontakty</title>
+<style>
+  :root{
+    --ink:#13203A; --paper:#FAFAF7; --card:#FFFFFF;
+    --mark:#E8A33D; --mark-soft:#FBE9C8;
+    --line:#E4E1D8; --muted:#6B7280;
+    --ok:#2E7D54; --err:#B23A2E; --err-soft:#F7E4E1;
+    --radius:14px; --shadow:0 1px 2px rgba(19,32,58,.06), 0 8px 24px rgba(19,32,58,.06);
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--paper);color:var(--ink);line-height:1.45;-webkit-text-size-adjust:100%;
+    padding:0 0 calc(132px + env(safe-area-inset-bottom))}
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+
+  header{padding:calc(18px + env(safe-area-inset-top)) 16px 18px;background:var(--ink);color:var(--paper)}
+  header .wrap{padding:0}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.02em}
+  .brand .mk{color:var(--ink);background:var(--mark);padding:1px 7px;border-radius:6px;
+    font-weight:800;font-size:13px;letter-spacing:.02em;transform:rotate(-1.5deg);display:inline-block}
+  header p{margin:6px 0 0;font-size:13px;color:#AEB6C7}
+
+  .setting{margin-top:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+    border-radius:12px;padding:10px 12px}
+  .setting + .setting{margin-top:8px}
+  .setting label{display:block;font-size:12px;color:#AEB6C7;margin-bottom:4px}
+  .setting input{width:100%;border:none;background:rgba(255,255,255,.95);color:var(--ink);
+    padding:9px 11px;border-radius:8px;font-size:15px}
+  .setting .note{font-size:11px;color:#8A93A6;margin:6px 0 0}
+  .setting .note a{color:var(--mark)}
+  details.adv summary{font-size:12px;color:#AEB6C7;cursor:pointer;list-style:none;margin-top:12px}
+  details.adv summary::-webkit-details-marker{display:none}
+
+  .banner{display:none;background:var(--err-soft);color:var(--err);font-size:13px;
+    padding:10px 16px;text-align:center;border-bottom:1px solid #efcfc9}
+  .banner.show{display:block}
+
+  main{padding-top:18px}
+  .scan{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+    background:var(--mark);color:var(--ink);border:none;cursor:pointer;
+    font-size:17px;font-weight:800;letter-spacing:-.01em;padding:18px;border-radius:var(--radius);
+    box-shadow:var(--shadow);transition:transform .08s ease}
+  .scan:active{transform:scale(.985)}
+  .scan svg{width:22px;height:22px}
+  .hint{text-align:center;color:var(--muted);font-size:13px;margin:10px 4px 0}
+
+  /* ořez */
+  .crop{display:none;margin-top:18px}
+  .crop.show{display:block}
+  .stage{position:relative;width:100%;background:#0c1322;border-radius:var(--radius);
+    overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+  .stage img{display:block;width:100%;pointer-events:none}
+  .cbox{position:absolute;border:2px solid var(--mark);box-sizing:border-box;cursor:move;
+    box-shadow:0 0 0 9999px rgba(8,12,22,.5)}
+  .handle{position:absolute;width:28px;height:28px;background:var(--mark);border:3px solid #fff;
+    border-radius:50%;box-sizing:border-box;touch-action:none}
+  .handle.tl{left:-14px;top:-14px} .handle.tr{right:-14px;top:-14px}
+  .handle.bl{left:-14px;bottom:-14px} .handle.br{right:-14px;bottom:-14px}
+  .crop-hint{text-align:center;color:var(--muted);font-size:12px;margin-top:8px}
+  .crop-actions{display:flex;gap:10px;margin-top:10px}
+  .crop-actions button{flex:1;border:none;cursor:pointer;font-weight:700;padding:14px;border-radius:11px;font-size:15px}
+  .cbtn-go{background:var(--mark);color:var(--ink)}
+  .cbtn-alt{background:var(--card);border:1px solid var(--line)!important;color:var(--ink)}
+  .retake{display:block;width:100%;text-align:center;background:none;border:none;color:var(--mark);
+    font-size:13px;font-weight:600;margin-top:10px;cursor:pointer}
+
+  .work{display:none;margin-top:18px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  .work.show{display:block}
+  .preview{width:100%;max-height:200px;object-fit:contain;display:block;background:#0c1322}
+  .progress{padding:14px 16px;display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted)}
+  .spinner{width:18px;height:18px;border:2.5px solid var(--mark-soft);border-top-color:var(--mark);
+    border-radius:50%;animation:spin .8s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .form{display:none;margin-top:18px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:6px 16px 16px;box-shadow:var(--shadow)}
+  .form.show{display:block}
+  .form h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin:16px 0 12px;font-weight:700}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+  .field input,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:11px 12px;
+    font-size:16px;font-family:inherit;color:var(--ink);background:#fff}
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--mark);box-shadow:0 0 0 3px var(--mark-soft)}
+  .field input.filled{background:linear-gradient(180deg,#fff 60%,var(--mark-soft) 60%)}
+  .row{display:flex;gap:10px} .row .field{flex:1}
+
+  details.raw{margin-top:6px}
+  details.raw summary{font-size:13px;color:var(--mark);cursor:pointer;font-weight:600;list-style:none;padding:6px 0}
+  details.raw summary::-webkit-details-marker{display:none}
+  details.raw pre{white-space:pre-wrap;font-size:12px;color:var(--muted);background:var(--paper);
+    border:1px solid var(--line);border-radius:9px;padding:10px;margin:4px 0 0;max-height:160px;overflow:auto}
+
+  .addbtn{width:100%;margin-top:6px;background:var(--ink);color:var(--paper);border:none;cursor:pointer;
+    font-size:16px;font-weight:700;padding:15px;border-radius:11px}
+  .addbtn:active{opacity:.9}
+
+  .tray{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+    box-shadow:0 -6px 20px rgba(19,32,58,.07);padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    transform:translateY(110%);transition:transform .25s ease;z-index:5}
+  .tray.show{transform:translateY(0)}
+  .tray .wrap{padding:0}
+  .tray-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .count{font-size:14px;font-weight:700} .count b{color:var(--mark)}
+  .clear{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline}
+  .list{max-height:120px;overflow:auto;margin-bottom:10px}
+  .item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .item:last-child{border-bottom:none}
+  .item .nm{font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .og{color:var(--muted);font-size:12px}
+  .item .del{background:none;border:none;color:var(--err);font-size:18px;cursor:pointer;line-height:1;padding:0 4px}
+  .tray-actions{display:flex;gap:10px}
+  .tray-actions button{flex:1;border:none;cursor:pointer;font-size:15px;font-weight:700;padding:14px;border-radius:11px}
+  .send{background:var(--mark);color:var(--ink)}
+  .download{background:var(--paper);color:var(--ink);border:1px solid var(--line)!important}
+
+  .toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));
+    transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;
+    border-radius:24px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s ease;
+    z-index:20;max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:var(--err)}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:24px 16px 8px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="banner" id="banner">Spusť appku přes adresu https:// (např. GitHub Pages). Z místního souboru nepůjde fotoaparát ani odeslání.</div>
+<header>
+  <div class="wrap">
+    <div class="brand"><h1>Vizitky</h1><span class="mk">&rarr; kontakt</span></div>
+    <p>Vyfoť vizitku, ořízni, zkontroluj, pošli jako .vcf.</p>
+    <div class="setting">
+      <label for="mailto">Sdílená schránka (kam posílat)</label>
+      <input id="mailto" type="email" inputmode="email" placeholder="vizitky@firma.cz" autocomplete="email">
+    </div>
+    <details class="adv">
+      <summary>Nastavení rozpoznávání</summary>
+      <div class="setting">
+        <label for="apikey">OCR.space API klíč</label>
+        <input id="apikey" type="text" placeholder="helloworld" autocomplete="off">
+        <p class="note">Výchozí „helloworld" je sdílený a pomalý. Vlastní klíč zdarma za minutu na
+        <a href="https://ocr.space/ocrapi/freekey" target="_blank" rel="noopener">ocr.space</a> a vlož sem.</p>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <button class="scan" id="scanBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Vyfotit vizitku
+    </button>
+    <input id="file" type="file" accept="image/*" capture="environment" hidden>
+    <p class="hint">Kartu vyfoť rovně, na světle a co největší.</p>
+
+    <div class="crop" id="crop">
+      <div class="stage" id="stage">
+        <img id="cropImg" alt="Vyfocená vizitka">
+        <div class="cbox" id="cbox">
+          <span class="handle tl" data-c="tl"></span>
+          <span class="handle tr" data-c="tr"></span>
+          <span class="handle bl" data-c="bl"></span>
+          <span class="handle br" data-c="br"></span>
+        </div>
+      </div>
+      <p class="crop-hint">Posuň a roztáhni rámeček přesně na vizitku.</p>
+      <div class="crop-actions">
+        <button class="cbtn-alt" id="wholeBtn">Celá fotka</button>
+        <button class="cbtn-go" id="cropBtn">Rozpoznat výřez</button>
+      </div>
+      <button class="retake" id="retakeBtn">Vyfotit znovu</button>
+    </div>
+
+    <div class="work" id="work">
+      <img class="preview" id="preview" alt="Náhled výřezu">
+      <div class="progress"><span class="spinner"></span><span id="progressTxt">Rozpoznávám text…</span></div>
+    </div>
+
+    <div class="form" id="form">
+      <h2>Zkontroluj a oprav</h2>
+      <div class="row">
+        <div class="field"><label>Jméno</label><input id="f_first" autocomplete="off"></div>
+        <div class="field"><label>Příjmení</label><input id="f_last" autocomplete="off"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Titul</label><input id="f_titul" autocomplete="off"></div>
+        <div class="field"><label>Pozice</label><input id="f_title" autocomplete="off"></div>
+      </div>
+      <div class="field"><label>Firma</label><input id="f_org" autocomplete="off"></div>
+      <div class="row">
+        <div class="field"><label>Telefon</label><input id="f_tel" inputmode="tel" autocomplete="off"></div>
+        <div class="field"><label>Mobil</label><input id="f_cell" inputmode="tel" autocomplete="off"></div>
+      </div>
+      <div class="field"><label>E-mail</label><input id="f_email" inputmode="email" autocomplete="off"></div>
+      <div class="field"><label>Web</label><input id="f_url" inputmode="url" autocomplete="off"></div>
+      <div class="field"><label>Adresa</label><input id="f_addr" autocomplete="off"></div>
+      <div class="field"><label>Poznámka</label><textarea id="f_note" rows="2"></textarea></div>
+      <details class="raw"><summary>Zobrazit celý rozpoznaný text</summary><pre id="rawText"></pre></details>
+      <button class="addbtn" id="addBtn">Přidat do dávky</button>
+    </div>
+  </div>
+</main>
+
+<div class="tray" id="tray">
+  <div class="wrap">
+    <div class="tray-top">
+      <span class="count">V dávce: <b id="count">0</b> kontaktů</span>
+      <button class="clear" id="clearBtn">Vymazat</button>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="tray-actions">
+      <button class="send" id="sendBtn">Odeslat e-mailem</button>
+      <button class="download" id="dlBtn">Stáhnout .vcf</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<footer>Výřez posílá na OCR.space jen kvůli rozpoznání (neukládá ho). Kontakty odejdou až na tvé kliknutí.</footer>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(id){return document.getElementById(id);};
+  var batch=[];
+
+  if(!window.isSecureContext) $("banner").classList.add("show");
+
+  try{ var sm=localStorage.getItem("vizitky_mailto"); if(sm) $("mailto").value=sm;
+       var sk=localStorage.getItem("vizitky_apikey"); $("apikey").value=sk||"helloworld";
+  }catch(e){ $("apikey").value="helloworld"; }
+  $("mailto").addEventListener("change",function(){ try{localStorage.setItem("vizitky_mailto",this.value.trim());}catch(e){} });
+  $("apikey").addEventListener("change",function(){ try{localStorage.setItem("vizitky_apikey",this.value.trim());}catch(e){} });
+
+  $("scanBtn").addEventListener("click",function(){ $("file").click(); });
+  $("retakeBtn").addEventListener("click",function(){ $("file").click(); });
+  $("file").addEventListener("change",function(e){ var f=e.target.files&&e.target.files[0]; if(f) showCrop(f); this.value=""; });
+
+  /* ---------- OŘEZ ---------- */
+  var stage=$("stage"),cImg=$("cropImg"),cbox=$("cbox");
+  var natW=0,natH=0,dispW=0,dispH=0,box={x:0,y:0,w:0,h:0},drag=null;
+  var CARD=1.586;
+
+  function showCrop(file){
+    var img=new Image();
+    img.onload=function(){
+      natW=img.naturalWidth; natH=img.naturalHeight;
+      cImg.src=img.src;
+      $("form").classList.remove("show"); $("work").classList.remove("show");
+      $("crop").classList.add("show");
+      requestAnimationFrame(function(){
+        dispW=stage.clientWidth||340; dispH=dispW*natH/natW;
+        stage.style.height=dispH+"px";
+        var w=dispW*0.88, h=w/CARD;
+        if(h>dispH*0.92){ h=dispH*0.92; w=h*CARD; if(w>dispW*0.96) w=dispW*0.96; }
+        box={x:(dispW-w)/2,y:(dispH-h)/2,w:w,h:h}; drawBox();
+      });
+      window.scrollTo({top:0,behavior:"smooth"});
+    };
+    img.src=URL.createObjectURL(file);
+  }
+  function drawBox(){ cbox.style.left=box.x+"px";cbox.style.top=box.y+"px";cbox.style.width=box.w+"px";cbox.style.height=box.h+"px"; }
+  function clampBox(){
+    box.w=Math.max(50,Math.min(box.w,dispW)); box.h=Math.max(50,Math.min(box.h,dispH));
+    box.x=Math.max(0,Math.min(box.x,dispW-box.w)); box.y=Math.max(0,Math.min(box.y,dispH-box.h));
+  }
+  cbox.addEventListener("pointerdown",function(e){
+    if(e.target.classList.contains("handle")) return;
+    drag={mode:"move",sx:e.clientX,sy:e.clientY,ox:box.x,oy:box.y};
+    cbox.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  cbox.addEventListener("pointermove",function(e){
+    if(!drag||drag.mode!=="move") return;
+    box.x=drag.ox+(e.clientX-drag.sx); box.y=drag.oy+(e.clientY-drag.sy); clampBox(); drawBox();
+  });
+  cbox.addEventListener("pointerup",function(){ drag=null; });
+  [].forEach.call(document.querySelectorAll(".handle"),function(h){
+    h.addEventListener("pointerdown",function(e){
+      drag={mode:"resize",c:h.getAttribute("data-c"),sx:e.clientX,sy:e.clientY,ox:box.x,oy:box.y,ow:box.w,oh:box.h};
+      h.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault();
+    });
+    h.addEventListener("pointermove",function(e){
+      if(!drag||drag.mode!=="resize") return;
+      var dx=e.clientX-drag.sx, dy=e.clientY-drag.sy, c=drag.c;
+      var x=drag.ox,y=drag.oy,w=drag.ow,hh=drag.oh;
+      if(c.indexOf("l")>-1){ x=drag.ox+dx; w=drag.ow-dx; }
+      if(c.indexOf("r")>-1){ w=drag.ow+dx; }
+      if(c.indexOf("t")>-1){ y=drag.oy+dy; hh=drag.oh-dy; }
+      if(c.indexOf("b")>-1){ hh=drag.oh+dy; }
+      box={x:x,y:y,w:Math.max(50,w),h:Math.max(50,hh)}; clampBox(); drawBox();
+    });
+    h.addEventListener("pointerup",function(){ drag=null; });
+  });
+
+  $("cropBtn").addEventListener("click",function(){ doCrop(false); });
+  $("wholeBtn").addEventListener("click",function(){ doCrop(true); });
+  function doCrop(whole){
+    var k=natW/dispW, sx,sy,sw,sh;
+    if(whole){ sx=0;sy=0;sw=natW;sh=natH; }
+    else{ sx=box.x*k; sy=box.y*k; sw=box.w*k; sh=box.h*k; }
+    var c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(sw)); c.height=Math.max(1,Math.round(sh));
+    var ctx=c.getContext("2d");
+    var img=new Image();
+    img.onload=function(){ ctx.drawImage(img,sx,sy,sw,sh,0,0,c.width,c.height); runOcr(c); };
+    img.src=cImg.src;
+  }
+
+  /* ---------- OCR ---------- */
+  function processCanvas(src,maxDim,maxBytes){
+    var s=Math.min(1,maxDim/Math.max(src.width,src.height));
+    var c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(src.width*s)); c.height=Math.max(1,Math.round(src.height*s));
+    var ctx=c.getContext("2d"); ctx.drawImage(src,0,0,c.width,c.height);
+    try{
+      var d=ctx.getImageData(0,0,c.width,c.height),p=d.data;
+      for(var i=0;i<p.length;i+=4){
+        var g=0.3*p[i]+0.59*p[i+1]+0.11*p[i+2]; g=(g-128)*1.25+128; g=g<0?0:g>255?255:g;
+        p[i]=p[i+1]=p[i+2]=g;
+      }
+      ctx.putImageData(d,0,0);
+    }catch(e){}
+    var q=0.85,url=c.toDataURL("image/jpeg",q);
+    while(url.length*0.75>maxBytes&&q>0.35){ q-=0.1; url=c.toDataURL("image/jpeg",q); }
+    return {url:url,canvas:c};
+  }
+  function runOcr(srcCanvas){
+    $("crop").classList.remove("show");
+    $("work").classList.add("show");
+    $("progressTxt").textContent="Rozpoznávám text…";
+    var out=processCanvas(srcCanvas,1700,900000);
+    $("preview").src=out.url;
+    window.scrollTo({top:0,behavior:"smooth"});
+    ocrSpace(out.url).catch(function(){
+      $("progressTxt").textContent="Bez signálu – zkouším v telefonu…"; return ocrLocal(out.canvas);
+    }).then(function(text){
+      $("work").classList.remove("show"); fillForm(text||"");
+      $("form").classList.add("show"); $("form").scrollIntoView({behavior:"smooth",block:"start"});
+    }).catch(function(err){
+      $("work").classList.remove("show");
+      toast("Rozpoznání selhalo. Zkus ostřejší foto nebo zkontroluj připojení.",true); console.error(err);
+    });
+  }
+  function ocrSpace(dataUrl){
+    var key=($("apikey").value||"helloworld").trim();
+    var form=new FormData();
+    form.append("base64Image",dataUrl);
+    form.append("OCREngine","2"); form.append("scale","true"); form.append("detectOrientation","true");
+    return fetch("https://api.ocr.space/parse/image",{method:"POST",headers:{apikey:key},body:form})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j.IsErroredOnProcessing){ throw new Error((j.ErrorMessage&&j.ErrorMessage[0])||"OCR chyba"); }
+        var pr=j.ParsedResults&&j.ParsedResults[0]; return pr?pr.ParsedText:"";
+      });
+  }
+  var tessLoading=null;
+  function loadTess(){
+    if(window.Tesseract) return Promise.resolve();
+    if(tessLoading) return tessLoading;
+    tessLoading=new Promise(function(res,rej){
+      var s=document.createElement("script");
+      s.src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js";
+      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+    });
+    return tessLoading;
+  }
+  function ocrLocal(canvas){
+    return loadTess().then(function(){ return Tesseract.recognize(canvas,"ces+eng").then(function(r){return r.data.text;}); });
+  }
+
+  /* ---------- PARSOVÁNÍ ---------- */
+  function deaccent(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
+  function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():s;}
+  var reLegal=/(s\.?\s?r\.?\s?o\.?|spol\.|a\.\s?s\.?|k\.\s?s\.?|v\.?\s?o\.?\s?s\.?|gmbh|\bltd\b|\binc\b|\bllc\b|\bag\b)/i;
+  var rePre=/(ing|mgr|bc|mudr|judr|phdr|rndr|prof|doc|dipl|paeddr|mvdr|thdr)/i;
+  var reSlogan=/(business|worldwide|solutions?|powering|systems?|technolog|services?|company|global|consulting|partners?|industries|trading|engineering|electric|electro|group|since|quality)/i;
+
+  function extractTitles(line){
+    var pre="",suf="",l=line;
+    var pm=l.match(/^((?:(?:ing|mgr|bc|mudr|judr|phdr|rndr|paeddr|mvdr|thdr|prof|doc|dipl)\.?\s+)+)/i);
+    if(pm){ pre=pm[1].replace(/\s+/g," ").trim(); l=l.slice(pm[1].length); }
+    var sm=l.match(/[,\s]+((?:ph\.?\s?d|csc|drsc|dis|d\.?i\.?s|mba|llm|dr|dipl)\.?)\s*$/i);
+    if(sm){ suf=sm[1].trim(); l=l.slice(0,sm.index); }
+    return {pre:pre,suf:suf,clean:l.trim()};
+  }
+
+  function looksLikeName(line){
+    var c=extractTitles(line).clean;
+    var w=c.split(/\s+/);
+    if(w.length<2||w.length>3) return false;
+    if(/[\d@&\/]/.test(c)) return false;
+    if(reLegal.test(c)||reSlogan.test(c)) return false;
+    if(c===c.toUpperCase()) return false;
+    return w.every(function(x){ return /^\p{Lu}[\p{Ll}.\-'’]+$/u.test(x); });
+  }
+
+  function parse(text){
+    var lines=text.split(/\r?\n/).map(function(l){return l.trim();}).filter(function(l){return l.length>1;});
+    var r={first:"",last:"",titul:"",org:"",title:"",tel:"",cell:"",email:"",url:"",addr:"",note:""};
+    var reEmail=/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/;
+    var rePhone=/(\+?\d[\d\s().\-\/]{7,}\d)/g;
+    var reUrl=/((https?:\/\/)?www\.[^\s]+|[a-z0-9.\-]+\.(cz|com|sk|eu|net|org|de|io)(\/[^\s]*)?)/i;
+    var reTitle=/(jednatel|ředitel|reditel|manaž|manaz|manager|director|obchodn|sales|account|specialist|specialista|zástupce|zastupce|vedoucí|vedouci|ceo|cfo|cto|owner|majitel|konzultant|consultant|asistent|technik|referent|engineer|inženýr|inzenyr)/i;
+    var reAddr=/(ulice|nám|nam\.|třída|trida|č\.?\s?p\.?|čp|street|str\.|\d+\/\d+)/i;
+
+    var used={},phoneItems=[];
+    lines.forEach(function(l,i){
+      if(!r.email){var em=l.match(reEmail);if(em){r.email=em[0];used[i]=1;}}
+      var ph;rePhone.lastIndex=0;var hadPhone=false;
+      while((ph=rePhone.exec(l))){
+        var digits=ph[0].replace(/\D/g,"");
+        if(digits.length<9) continue;
+        hadPhone=true;
+        var mob=/mobil|mob\.|gsm|cell|\bm[\s:]/i.test(l);
+        var fax=/fax/i.test(l);
+        var tel=/tel|phone|pevn|office|kancel/i.test(l);
+        var nat=digits.replace(/^00/,"").replace(/^420/,"");
+        var fd=nat.charAt(0);
+        var isMob=mob||(!tel&&!fax&&(fd==="6"||fd==="7"));
+        phoneItems.push({num:ph[0].trim(),mob:isMob,fax:fax});
+      }
+      if(hadPhone) used[i]=1;
+      if(!r.url){var u=l.match(reUrl);if(u&&!reEmail.test(l)){r.url=u[0].replace(/[.,;]$/,"");used[i]=1;}}
+    });
+    phoneItems.forEach(function(p){
+      if(p.fax) return;
+      if(p.mob){ if(!r.cell) r.cell=p.num; else if(!r.tel) r.tel=p.num; }
+      else { if(!r.tel) r.tel=p.num; else if(!r.cell) r.cell=p.num; }
+    });
+
+    /* nápověda z e-mailu (i camelCase: LukasBradna -> Lukas Bradna) */
+    var hf="",hl="",hOrg="";
+    if(r.email){
+      var m=r.email.split("@");
+      var toks=m[0].replace(/([a-z])([A-Z])/g,"$1 $2").split(/[._\-\s]+/)
+                   .map(function(x){return x.replace(/\d+/g,"").toLowerCase();})
+                   .filter(function(x){return x.length>1;});
+      if(toks.length>=2){ hf=toks[0]; hl=toks[toks.length-1]; }
+      else if(toks.length===1){ hl=toks[0]; }   /* např. t.tupy -> hl=tupy */
+      var dom=(m[1]||"").split(".")[0];
+      if(dom&&dom.length>2&&!/gmail|seznam|email|outlook|hotmail|yahoo|centrum|volny|icloud|post|live/.test(dom)) hOrg=dom;
+    }
+
+    lines.forEach(function(l,i){ if(!used[i]&&!r.title&&reTitle.test(l)){r.title=l;used[i]="title";} });
+    lines.forEach(function(l,i){ if(!used[i]&&!r.addr&&reAddr.test(l)){r.addr=l;used[i]="addr";} });
+
+    /* JMÉNO – nejdřív podle e-mailové nápovědy */
+    var nameLine="",nameIdx=-1;
+    if(hf||hl){
+      for(var i=0;i<lines.length;i++){
+        if(used[i]) continue;
+        var d=deaccent(lines[i]); var w=lines[i].split(/\s+/);
+        if(w.length>4||reLegal.test(lines[i])) continue;
+        if((hl&&hl.length>=3&&d.indexOf(hl)>-1)||(hf&&hf.length>=3&&d.indexOf(hf)>-1)){ nameLine=lines[i];nameIdx=i;break; }
+      }
+    }
+    if(!nameLine){
+      for(var j=0;j<lines.length;j++){ if(!used[j]&&looksLikeName(lines[j])){ nameLine=lines[j];nameIdx=j;break; } }
+    }
+    if(nameLine){
+      used[nameIdx]="name";
+      var t=extractTitles(nameLine);
+      r.titul=[t.pre,t.suf].filter(Boolean).join(", ");
+      var parts=t.clean.split(/\s+/);
+      var last="";
+      if(hl){ for(var k=0;k<parts.length;k++){ if(deaccent(parts[k]).indexOf(hl)>-1){ last=parts.splice(k,1)[0];break; } } }
+      if(!last) last=parts.pop();
+      r.last=cap(last); r.first=parts.map(cap).join(" ");
+    } else if(hf&&hl){ r.first=cap(hf); r.last=cap(hl); }
+
+    /* FIRMA */
+    function findOrg(test){ for(var a=0;a<lines.length;a++){ if(!used[a]&&test(lines[a])){ used[a]="org"; return lines[a]; } } return ""; }
+    r.org = findOrg(function(l){ return reLegal.test(l) && (!hOrg || deaccent(l).indexOf(hOrg)>-1); })
+         || findOrg(function(l){ return reLegal.test(l); })
+         || (hOrg ? findOrg(function(l){ return deaccent(l).indexOf(hOrg)>-1 && !reSlogan.test(l); }) : "")
+         || (hOrg ? cap(hOrg) : "")
+         || findOrg(function(l){ return !reSlogan.test(l) && !/^[•\W]+$/.test(l); });
+    return r;
+  }
+
+  function fillForm(text){
+    var r=parse(text);
+    set("f_first",r.first);set("f_last",r.last);set("f_titul",r.titul);set("f_org",r.org);set("f_title",r.title);
+    set("f_tel",r.tel);set("f_cell",r.cell);set("f_email",r.email);set("f_url",r.url);set("f_addr",r.addr);
+    $("f_note").value=""; $("rawText").textContent=text.trim()||"(nic se nerozpoznalo)";
+  }
+  function set(id,val){
+    var el=$(id);el.value=val||"";el.classList.toggle("filled",!!val);
+    el.addEventListener("input",function(){el.classList.remove("filled");},{once:true});
+  }
+
+  $("addBtn").addEventListener("click",function(){
+    var c={first:$("f_first").value.trim(),last:$("f_last").value.trim(),titul:$("f_titul").value.trim(),org:$("f_org").value.trim(),
+      title:$("f_title").value.trim(),tel:$("f_tel").value.trim(),cell:$("f_cell").value.trim(),
+      email:$("f_email").value.trim(),url:$("f_url").value.trim(),addr:$("f_addr").value.trim(),
+      note:$("f_note").value.trim()};
+    if(!c.first&&!c.last&&!c.org&&!c.email){toast("Vyplň aspoň jméno, firmu nebo e-mail.",true);return;}
+    batch.push(c);renderTray();
+    $("form").classList.remove("show");
+    toast("Přidáno do dávky ✓");
+    window.scrollTo({top:0,behavior:"smooth"});
+  });
+
+  function titulSplit(t){
+    var pre="",suf="";
+    if(t){ if(/^(ing|mgr|bc|mudr|judr|phdr|rndr|prof|doc|dipl|paeddr|mvdr|thdr)\.?/i.test(t)) pre=t; else suf=t; }
+    return {pre:pre,suf:suf};
+  }
+  function fullName(c){
+    var ts=titulSplit(c.titul);
+    var base=(c.first+" "+c.last).trim();
+    var fn=((ts.pre?ts.pre+" ":"")+base+(ts.suf?", "+ts.suf:"")).trim();
+    return fn||c.org||c.email;
+  }
+  function renderTray(){
+    $("count").textContent=batch.length;
+    var list=$("list");list.innerHTML="";
+    batch.forEach(function(c,idx){
+      var row=document.createElement("div");row.className="item";
+      var nm=document.createElement("span");nm.className="nm";nm.textContent=fullName(c);
+      var og=document.createElement("span");og.className="og";og.textContent=c.org||"";
+      var del=document.createElement("button");del.className="del";del.innerHTML="&times;";
+      del.setAttribute("aria-label","Odebrat"); del.onclick=function(){batch.splice(idx,1);renderTray();};
+      row.appendChild(nm);row.appendChild(og);row.appendChild(del);list.appendChild(row);
+    });
+    $("tray").classList.toggle("show",batch.length>0);
+  }
+  $("clearBtn").addEventListener("click",function(){
+    if(batch.length&&confirm("Opravdu vymazat celou dávku?")){batch=[];renderTray();}
+  });
+
+  /* ---------- vCard ---------- */
+  function esc(s){return (s||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;");}
+  function toVCard(c){
+    var ts=titulSplit(c.titul);
+    var v=["BEGIN:VCARD","VERSION:3.0"];
+    v.push("UID:"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10));
+    v.push("N:"+esc(c.last)+";"+esc(c.first)+";;"+esc(ts.pre)+";"+esc(ts.suf));
+    v.push("FN:"+esc(fullName(c)));
+    if(c.org)v.push("ORG:"+esc(c.org));
+    if(c.title)v.push("TITLE:"+esc(c.title));
+    if(c.tel)v.push("TEL;TYPE=WORK,VOICE:"+esc(c.tel));
+    if(c.cell)v.push("TEL;TYPE=CELL:"+esc(c.cell));
+    if(c.email)v.push("EMAIL;TYPE=WORK:"+esc(c.email));
+    if(c.url)v.push("URL:"+esc(c.url));
+    if(c.addr)v.push("ADR;TYPE=WORK:;;"+esc(c.addr)+";;;;");
+    if(c.note)v.push("NOTE:"+esc(c.note));
+    v.push("END:VCARD"); return v.join("\r\n");
+  }
+  function buildVcf(){return batch.map(toVCard).join("\r\n")+"\r\n";}
+  function vcfName(){return "vizitky-"+new Date().toISOString().slice(0,10)+"-"+batch.length+".vcf";}
+  function downloadVcf(vcf,name){
+    var blob=new Blob([vcf],{type:"text/vcard;charset=utf-8"});
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();
+  }
+
+  $("dlBtn").addEventListener("click",function(){
+    if(!batch.length)return; downloadVcf(buildVcf(),vcfName()); toast("Soubor stažen ✓");
+  });
+
+  function slug(c){
+    var base=(c.first+" "+c.last).trim()||c.org||c.email||"kontakt";
+    return (base.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9]+/g,"-")
+      .replace(/^-+|-+$/g,"").toLowerCase().slice(0,40))||"kontakt";
+  }
+  $("sendBtn").addEventListener("click",function(){
+    if(!batch.length)return;
+    var to=$("mailto").value.trim();
+    var subj=batch.length+" kontaktů z vizitek ("+new Date().toLocaleDateString("cs-CZ")+")";
+    /* jeden .vcf na kontakt = spolehlivý import i v telefonu */
+    var seen={}, files=batch.map(function(c){
+      var name=slug(c); if(seen[name]) name+="-"+(++seen[name]); else seen[name]=1;
+      return new File([toVCard(c)+"\r\n"], name+".vcf", {type:"text/vcard"});
+    });
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:files})){
+      navigator.share({files:files,title:subj,text:(to?("Příjemce: "+to):subj)})
+        .then(function(){ toast(to?("Přiloženo "+files.length+" kontaktů. Příjemce: "+to):("Přiloženo "+files.length+" kontaktů ✓")); })
+        .catch(function(err){ if(err&&err.name==="AbortError")return; shareCombined(to,subj); });
+    } else { shareCombined(to,subj); }
+  });
+  function shareCombined(to,subj){
+    var combined=new File([buildVcf()],vcfName(),{type:"text/vcard"});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[combined]})){
+      navigator.share({files:[combined],title:subj,text:(to?("Příjemce: "+to):subj)})
+        .then(function(){ toast(to?("Soubor přiložen. Příjemce: "+to):"Soubor přiložen ✓"); })
+        .catch(function(err){ if(err&&err.name==="AbortError")return; mailFallback(to,subj); });
+    } else { mailFallback(to,subj); }
+  }
+  function mailFallback(to,subj){
+    var fname=vcfName(); downloadVcf(buildVcf(),fname);
+    var body="Přikládám "+batch.length+" kontaktů v jednom souboru "+fname+" (právě stažený do telefonu) – prosím přilož ho k tomuto e-mailu. Telefon přílohu nevloží automaticky.";
+    var a=document.createElement("a");a.href="mailto:"+to+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
+    document.body.appendChild(a);setTimeout(function(){a.click();a.remove();},350);
+    toast("Stažen 1 soubor s "+batch.length+" kontakty – přilož ho do e-mailu.");
+  }
+
+  var toastT;
+  function toast(msg,isErr){
+    var t=$("toast");t.textContent=msg;t.classList.toggle("err",!!isErr);t.classList.add("show");
+    clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("show");},3200);
+  }
+})();
+</script>
+</body>
+</html>
